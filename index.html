@@ -143,7 +143,7 @@
           
           <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; margin-bottom: 16px; gap: 16px;">
             <div style="width: 80px; flex-shrink: 0; text-align: center;">
-              <img src="${LOGO_URL}" alt="Logo BTC" style="max-height: 70px; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;" onerror="this.style.display='none'">
+              <img id="printLogoImg" src="${LOGO_URL}" alt="Logo BTC" style="max-height: 70px; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;" onerror="this.style.display='none'">
             </div>
 
             <div style="flex: 1; text-align: center;">
@@ -158,7 +158,7 @@
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
             <div style="flex: 1; padding-right: 12px;">
               <div style="margin-bottom: 8px;">
-                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">SỐ BÁO DANH</span>
+                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">SỐ BÁO DANH:</span>
                 <p style="font-size: 18px; font-weight: bold; color: #1d4ed8; margin: 2px 0;">${item.profileCode || '—'}</p>
               </div>
               <div style="margin-bottom: 8px;">
@@ -191,8 +191,22 @@
       `;
 
       printArea.classList.remove('hidden');
-      window.print();
-      printArea.classList.add('hidden');
+
+      // Đảm bảo logo kịp tải trước khi mở lệnh in
+      const img = document.getElementById('printLogoImg');
+      if (img && !img.complete) {
+        img.onload = () => {
+          window.print();
+          printArea.classList.add('hidden');
+        };
+        img.onerror = () => {
+          window.print();
+          printArea.classList.add('hidden');
+        };
+      } else {
+        window.print();
+        printArea.classList.add('hidden');
+      }
     };
 
     form.addEventListener('submit', async (e) => {
@@ -273,7 +287,6 @@
                 </div>
               </div>
 
-              <!-- Khu vực nút In hoặc thông báo hồ sơ không hợp lệ -->
               ${printButtonHtml}
             `;
             results.appendChild(card);
