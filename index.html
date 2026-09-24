@@ -5,36 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tra Cứu Thông Tin Đăng Ký Cuộc Thi</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Định dạng in ấn: Khi in chỉ hiển thị thẻ dự thi, ẩn các thành phần website khác */
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      #printArea, #printArea * {
-        visibility: visible;
-      }
-      #printArea {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        margin: 0;
-        padding: 20px;
-        display: block !important;
-      }
-      .no-print {
-        display: none !important;
-      }
-      @page {
-        size: A5 landscape;
-        margin: 10mm;
-      }
-    }
-  </style>
+  <!-- Thư viện chụp và xuất khung HTML thành file ảnh -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body class="bg-slate-50 min-h-screen py-10 px-4 text-slate-800">
-  <div class="max-w-xl mx-auto no-print">
+  <div class="max-w-xl mx-auto">
     <!-- Header -->
     <div class="text-center mb-8">
       <h1 class="text-2xl font-bold text-blue-900 uppercase">HỆ THỐNG IN GIẤY BÁO DỰ THI</h1>
@@ -82,8 +57,12 @@
     <div id="results" class="space-y-5"></div>
   </div>
 
-  <!-- Khu vực mẫu thẻ dự thi (ẩn trên web, chỉ hiện khi in) -->
-  <div id="printArea" class="hidden"></div>
+  <!-- Khung kết xuất ảnh (được đặt ngoài màn hình hiển thị để chụp ảnh chuẩn kích thước mà không bị vỡ bố cục) -->
+  <div style="position: absolute; left: -9999px; top: -9999px;">
+    <div id="captureArea" style="width: 650px; background-color: #ffffff; border: 2px solid #1e3a8a; border-radius: 12px; padding: 24px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; box-sizing: border-box;">
+      <!-- Nội dung thẻ được tạo tự động bằng JS -->
+    </div>
+  </div>
 
   <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcGIv7WOnsdezBj1aBqqjfkPqTiLCbBM1AUfNf3JhYGfuq2uiWeszeHnHZeN7pgg6RvQ/exec";
@@ -96,9 +75,8 @@
     const message = document.getElementById('message');
     const results = document.getElementById('results');
     const btnSearch = document.getElementById('btnSearch');
-    const printArea = document.getElementById('printArea');
+    const captureArea = document.getElementById('captureArea');
 
-    // Kiểm tra xem trạng thái có phải là không hợp lệ hay không
     function isInvalidStatus(status) {
       const s = String(status || '').toLowerCase();
       return s.includes('không hợp lệ') || 
@@ -109,103 +87,121 @@
              s.includes('chưa đạt');
     }
 
-    // Gán màu sắc huy hiệu trạng thái
     function getStatusBadgeClass(status) {
       const s = String(status || '').toLowerCase();
-      
-      // Ưu tiên kiểm tra không hợp lệ / trùng dữ liệu trước -> Tô đỏ
       if (isInvalidStatus(status)) {
         return 'bg-rose-50 text-rose-700 border-rose-300 font-bold';
       }
-      
-      // Hợp lệ / Đã duyệt -> Xanh lá
       if (s.includes('hợp lệ') || s.includes('thành công') || s.includes('đã duyệt') || s.includes('hoàn tất')) {
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       } 
-      
-      // Chờ duyệt / Bổ sung -> Màu cam vàng
       if (s.includes('chờ') || s.includes('đang')) {
         return 'bg-amber-50 text-amber-700 border-amber-200';
       }
-      
       return 'bg-blue-50 text-blue-700 border-blue-200';
     }
 
-    // Hàm in thẻ dự thi có kèm Logo BTC
-    window.printCard = function(index) {
+    // Hàm chuyển đổi tiếng Việt có dấu thành không dấu để đặt tên file tải về
+    function removeVietnameseTones(str) {
+      return str.normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    // Hàm xuất giấy báo thành file ảnh PNG
+    window.downloadImage = async function(index, btnElement) {
       const item = fetchedData[index];
       if (!item) return;
 
-      const LOGO_URL = "TST.png"; // Đặt file logo.png cùng thư mục trên GitHub hoặc dán link online
+      const originalBtnText = btnElement.innerHTML;
+      btnElement.disabled = true;
+      btnElement.innerHTML = `
+        <svg class="animate-spin h-4 w-4 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Đang tạo ảnh...
+      `;
 
-      printArea.innerHTML = `
-        <div style="border: 2px solid #1e3a8a; border-radius: 12px; padding: 20px 24px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; max-width: 650px; margin: auto; background: #fff;">
-          
-          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; margin-bottom: 16px; gap: 16px;">
-            <div style="width: 80px; flex-shrink: 0; text-align: center;">
-              <img id="printLogoImg" src="${LOGO_URL}" alt="Logo BTC" style="max-height: 70px; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;" onerror="this.style.display='none'">
+      const LOGO_URL = "TST.png";
+
+      // Render nội dung giấy báo vào khung chụp ảnh
+      captureArea.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; margin-bottom: 16px; gap: 16px;">
+          <div style="width: 85px; flex-shrink: 0; text-align: center;">
+            <img id="captureLogoImg" src="${LOGO_URL}" alt="Logo BTC" style="max-height: 75px; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;" onerror="this.style.display='none'">
+          </div>
+          <div style="flex: 1; text-align: center;">
+            <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #475569; font-weight: bold; margin: 0 0 2px 0;">CUỘC THI TOÁN QUỐC TẾ ELMO NĂM 2026</p>
+            <h2 style="font-size: 20px; font-weight: 800; color: #1e3a8a; margin: 2px 0; text-transform: uppercase;">PHIẾU BÁO DỰ THI</h2>
+            <p style="font-size: 12px; color: #64748b; margin: 0;">Kỳ thi ngày 14/11/2026 (thứ Bảy)</p>
+          </div>
+          <div style="width: 85px; flex-shrink: 0;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+          <div style="flex: 1; padding-right: 16px;">
+            <div style="margin-bottom: 8px;">
+              <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">SỐ BÁO DANH:</span>
+              <p style="font-size: 19px; font-weight: bold; color: #1d4ed8; margin: 2px 0;">${item.profileCode || '—'}</p>
             </div>
-
-            <div style="flex: 1; text-align: center;">
-              <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #475569; font-weight: bold; margin: 0 0 2px 0;">CUỘC THI TOÁN QUỐC TẾ ELMO NĂM 2026</p>
-              <h2 style="font-size: 19px; font-weight: 800; color: #1e3a8a; margin: 2px 0; text-transform: uppercase;">PHIẾU BÁO DỰ THI</h2>
-              <p style="font-size: 12px; color: #64748b; margin: 0;">Kỳ thi ngày 14/11/2026 (thứ Bảy)</p>
+            <div style="margin-bottom: 8px;">
+              <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">HỌ VÀ TÊN THÍ SINH:</span>
+              <p style="font-size: 18px; font-weight: bold; color: #0f172a; margin: 2px 0;">${item.fullName || '—'}</p>
             </div>
-
-            <div style="width: 80px; flex-shrink: 0;"></div>
+            <div style="margin-bottom: 8px;">
+              <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">BẢNG DỰ THI:</span>
+              <p style="font-size: 14px; font-weight: 600; color: #0f172a; margin: 2px 0;">${item.group || '—'}</p>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">TRƯỜNG:</span>
+              <p style="font-size: 14px; font-weight: 500; color: #0f172a; margin: 2px 0;">${item.schoolName || '—'}</p>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">ĐỊA ĐIỂM THI:</span>
+              <p style="font-size: 14px; font-weight: 600; color: #0f172a; margin: 2px 0;">${item.venue || '—'}</p>
+            </div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-            <div style="flex: 1; padding-right: 12px;">
-              <div style="margin-bottom: 8px;">
-                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">SỐ BÁO DANH:</span>
-                <p style="font-size: 18px; font-weight: bold; color: #1d4ed8; margin: 2px 0;">${item.profileCode || '—'}</p>
-              </div>
-              <div style="margin-bottom: 8px;">
-                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Họ và tên thí sinh:</span>
-                <p style="font-size: 17px; font-weight: bold; color: #0f172a; margin: 2px 0;">${item.fullName || '—'}</p>
-              </div>
-              <div style="margin-bottom: 8px;">
-                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Bảng dự thi:</span>
-                <p style="font-size: 14px; font-weight: 600; color: #0f172a; margin: 2px 0;">${item.group || '—'}</p>
-              </div>
-              <div style="margin-bottom: 8px;">
-                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Trường:</span>
-                <p style="font-size: 14px; font-weight: 500; color: #0f172a; margin: 2px 0;">${item.schoolName || '—'}</p>
-              </div>
-              <div style="margin-bottom: 8px;">
-                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Địa điểm thi:</span>
-                <p style="font-size: 14px; font-weight: 600; color: #0f172a; margin: 2px 0;">${item.venue || '—'}</p>
-              </div>
-            </div>
-
-            <div style="width: 100px; height: 130px; border: 1.5px dashed #94a3b8; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; color: #94a3b8; border-radius: 6px; flex-shrink: 0; background-color: #f8fafc;">
-              Ảnh 3x4<br>(nếu có yêu cầu)
-            </div>
+          <div style="width: 100px; height: 130px; border: 1.5px dashed #94a3b8; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; color: #94a3b8; border-radius: 6px; flex-shrink: 0; background-color: #f8fafc;">
+            Ảnh 3x4<br>(nếu có yêu cầu)
           </div>
+        </div>
 
-          <div style="margin-top: 12px; font-size: 11px; color: #64748b; font-style: italic; text-align: center;">
-            * Thí sinh vui lòng mang theo thẻ học sinh/CCCD và phiếu báo này khi đến phòng thi.
-          </div>
+        <div style="margin-top: 14px; font-size: 11px; color: #64748b; font-style: italic; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+          * Thí sinh vui lòng mang theo thẻ học sinh/CCCD và phiếu báo này khi đến phòng thi.
         </div>
       `;
 
-      printArea.classList.remove('hidden');
-
-      // Đảm bảo logo kịp tải trước khi mở lệnh in
-      const img = document.getElementById('printLogoImg');
+      // Đợi ảnh logo sẵn sàng
+      const img = document.getElementById('captureLogoImg');
       if (img && !img.complete) {
-        img.onload = () => {
-          window.print();
-          printArea.classList.add('hidden');
-        };
-        img.onerror = () => {
-          window.print();
-          printArea.classList.add('hidden');
-        };
-      } else {
-        window.print();
-        printArea.classList.add('hidden');
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }
+
+      try {
+        const canvas = await html2canvas(captureArea, {
+          scale: 2, // Tăng gấp đôi độ phân giải giúp ảnh cực kỳ sắc nét khi zoom trên điện thoại
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+
+        // Tạo liên kết tải ảnh
+        const link = document.createElement('a');
+        const sbd = item.profileCode ? removeVietnameseTones(item.profileCode) : 'SBD';
+        const name = item.fullName ? removeVietnameseTones(item.fullName) : 'ThiSinh';
+        link.download = `GiayBao_${sbd}_${name}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (e) {
+        alert('Không thể tạo file ảnh. Vui lòng thử lại!');
+      } finally {
+        btnElement.disabled = false;
+        btnElement.innerHTML = originalBtnText;
       }
     };
 
@@ -235,21 +231,20 @@
             const badgeClass = getStatusBadgeClass(item.status);
             const isInvalid = isInvalidStatus(item.status);
 
-            // Nút in thẻ: Nếu không hợp lệ thì ẩn hoàn toàn, ngược lại hiển thị nút in
-            const printButtonHtml = isInvalid 
+            const downloadButtonHtml = isInvalid 
               ? `<div class="pt-2 border-t text-right">
-                   <span class="text-xs text-rose-500 italic font-medium">Không thể in thẻ dự thi cho mã hồ sơ này</span>
+                   <span class="text-xs text-rose-500 italic font-medium">Không thể xuất giấy báo dự thi cho mã hồ sơ này</span>
                  </div>`
               : `<div class="pt-2 border-t flex justify-end">
                    <button 
                      type="button" 
-                     onclick="printCard(${index})" 
-                     class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-blue-50 text-blue-700 hover:text-blue-800 text-sm font-semibold rounded-xl border border-slate-200 hover:border-blue-300 transition duration-150"
+                     onclick="downloadImage(${index}, this)" 
+                     class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 text-sm font-semibold rounded-xl border border-blue-200 transition duration-150"
                    >
                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                      </svg>
-                     In thẻ dự thi / Lưu PDF
+                     Tải ảnh giấy báo dự thi
                    </button>
                  </div>`;
 
@@ -287,7 +282,7 @@
                 </div>
               </div>
 
-              ${printButtonHtml}
+              ${downloadButtonHtml}
             `;
             results.appendChild(card);
           });
