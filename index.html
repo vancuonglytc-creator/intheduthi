@@ -57,11 +57,9 @@
     <div id="results" class="space-y-5"></div>
   </div>
 
-  <!-- Khung kết xuất ảnh (được đặt ngoài màn hình hiển thị để chụp ảnh chuẩn kích thước mà không bị vỡ bố cục) -->
+  <!-- Khung kết xuất ảnh (được ẩn ngoài màn hình) -->
   <div style="position: absolute; left: -9999px; top: -9999px;">
-    <div id="captureArea" style="width: 650px; background-color: #ffffff; border: 2px solid #1e3a8a; border-radius: 12px; padding: 24px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; box-sizing: border-box;">
-      <!-- Nội dung thẻ được tạo tự động bằng JS -->
-    </div>
+    <div id="captureArea" style="width: 650px; background-color: #ffffff; border: 2px solid #1e3a8a; border-radius: 12px; padding: 24px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; box-sizing: border-box;"></div>
   </div>
 
   <script>
@@ -77,6 +75,7 @@
     const btnSearch = document.getElementById('btnSearch');
     const captureArea = document.getElementById('captureArea');
 
+    // Kiểm tra hồ sơ bị từ chối / không hợp lệ
     function isInvalidStatus(status) {
       const s = String(status || '').toLowerCase();
       return s.includes('không hợp lệ') || 
@@ -87,21 +86,37 @@
              s.includes('chưa đạt');
     }
 
+    // Kiểm tra hồ sơ đang ở trạng thái chờ
+    function isPendingStatus(status) {
+      const s = String(status || '').toLowerCase();
+      return s.includes('chờ') || s.includes('đang') || s.includes('xem xét');
+    }
+
+    // Xác định hồ sơ có đủ điều kiện in/tải thẻ hay không
+    function canDownloadCard(status) {
+      const s = String(status || '').toLowerCase();
+      // Bị loại hoặc đang chờ thì KHÔNG được tải
+      if (isInvalidStatus(status) || isPendingStatus(status)) {
+        return false;
+      }
+      // Chỉ khi hợp lệ / đã duyệt / thành công
+      return s.includes('hợp lệ') || s.includes('thành công') || s.includes('đã duyệt') || s.includes('hoàn tất') || s.includes('đã xác nhận');
+    }
+
     function getStatusBadgeClass(status) {
       const s = String(status || '').toLowerCase();
       if (isInvalidStatus(status)) {
         return 'bg-rose-50 text-rose-700 border-rose-300 font-bold';
       }
-      if (s.includes('hợp lệ') || s.includes('thành công') || s.includes('đã duyệt') || s.includes('hoàn tất')) {
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      } 
-      if (s.includes('chờ') || s.includes('đang')) {
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+      if (isPendingStatus(status)) {
+        return 'bg-amber-50 text-amber-700 border-amber-300 font-medium';
       }
+      if (s.includes('hợp lệ') || s.includes('thành công') || s.includes('đã duyệt') || s.includes('hoàn tất') || s.includes('đã xác nhận')) {
+        return 'bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold';
+      } 
       return 'bg-blue-50 text-blue-700 border-blue-200';
     }
 
-    // Hàm chuyển đổi tiếng Việt có dấu thành không dấu để đặt tên file tải về
     function removeVietnameseTones(str) {
       return str.normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
@@ -109,7 +124,6 @@
         .replace(/[^a-zA-Z0-9]/g, '_');
     }
 
-    // Hàm xuất giấy báo thành file ảnh PNG
     window.downloadImage = async function(index, btnElement) {
       const item = fetchedData[index];
       if (!item) return;
@@ -126,7 +140,6 @@
 
       const LOGO_URL = "TST.png";
 
-      // Render nội dung giấy báo vào khung chụp ảnh
       captureArea.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; margin-bottom: 16px; gap: 16px;">
           <div style="width: 85px; flex-shrink: 0; text-align: center;">
@@ -174,7 +187,6 @@
         </div>
       `;
 
-      // Đợi ảnh logo sẵn sàng
       const img = document.getElementById('captureLogoImg');
       if (img && !img.complete) {
         await new Promise((resolve) => {
@@ -185,12 +197,11 @@
 
       try {
         const canvas = await html2canvas(captureArea, {
-          scale: 2, // Tăng gấp đôi độ phân giải giúp ảnh cực kỳ sắc nét khi zoom trên điện thoại
+          scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff'
         });
 
-        // Tạo liên kết tải ảnh
         const link = document.createElement('a');
         const sbd = item.profileCode ? removeVietnameseTones(item.profileCode) : 'SBD';
         const name = item.fullName ? removeVietnameseTones(item.fullName) : 'ThiSinh';
@@ -229,24 +240,40 @@
             card.className = "bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4";
             
             const badgeClass = getStatusBadgeClass(item.status);
+            const isEligible = canDownloadCard(item.status);
             const isInvalid = isInvalidStatus(item.status);
+            const isPending = isPendingStatus(item.status);
 
-            const downloadButtonHtml = isInvalid 
-              ? `<div class="pt-2 border-t text-right">
-                   <span class="text-xs text-rose-500 italic font-medium">Không thể xuất giấy báo dự thi cho mã hồ sơ này</span>
-                 </div>`
-              : `<div class="pt-2 border-t flex justify-end">
-                   <button 
-                     type="button" 
-                     onclick="downloadImage(${index}, this)" 
-                     class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 text-sm font-semibold rounded-xl border border-blue-200 transition duration-150"
-                   >
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                     </svg>
-                     Tải ảnh giấy báo dự thi
-                   </button>
-                 </div>`;
+            // Xử lý hiển thị nút tải hoặc thông báo trạng thái
+            let actionAreaHtml = '';
+            if (isEligible) {
+              actionAreaHtml = `
+                <div class="pt-2 border-t flex justify-end">
+                  <button 
+                    type="button" 
+                    onclick="downloadImage(${index}, this)" 
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 text-sm font-semibold rounded-xl border border-blue-200 transition duration-150"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Tải ảnh giấy báo dự thi
+                  </button>
+                </div>
+              `;
+            } else if (isPending) {
+              actionAreaHtml = `
+                <div class="pt-2 border-t text-right">
+                  <span class="text-xs text-amber-600 italic font-medium">Hồ sơ đang chờ xác nhận. Giấy báo sẽ mở tải sau khi được duyệt hợp lệ.</span>
+                </div>
+              `;
+            } else {
+              actionAreaHtml = `
+                <div class="pt-2 border-t text-right">
+                  <span class="text-xs text-rose-500 italic font-medium">Không thể xuất giấy báo dự thi cho mã hồ sơ này.</span>
+                </div>
+              `;
+            }
 
             card.innerHTML = `
               <div class="flex items-center justify-between border-b pb-3">
@@ -282,7 +309,7 @@
                 </div>
               </div>
 
-              ${downloadButtonHtml}
+              ${actionAreaHtml}
             `;
             results.appendChild(card);
           });
