@@ -27,7 +27,7 @@
         display: none !important;
       }
       @page {
-        size: A5 landscape; /* Có thể đổi thành A4 portrait nếu muốn */
+        size: A5 landscape;
         margin: 10mm;
       }
     }
@@ -88,7 +88,7 @@
   <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcGIv7WOnsdezBj1aBqqjfkPqTiLCbBM1AUfNf3JhYGfuq2uiWeszeHnHZeN7pgg6RvQ/exec";
 
-    let fetchedData = []; // Lưu tạm kết quả tìm kiếm
+    let fetchedData = []; 
 
     const form = document.getElementById('searchForm');
     const phoneInput = document.getElementById('phone');
@@ -98,63 +98,95 @@
     const btnSearch = document.getElementById('btnSearch');
     const printArea = document.getElementById('printArea');
 
+    // Kiểm tra xem trạng thái có phải là không hợp lệ hay không
+    function isInvalidStatus(status) {
+      const s = String(status || '').toLowerCase();
+      return s.includes('không hợp lệ') || 
+             s.includes('trùng dữ liệu') || 
+             s.includes('hủy') || 
+             s.includes('loại') || 
+             s.includes('từ chối') ||
+             s.includes('chưa đạt');
+    }
+
+    // Gán màu sắc huy hiệu trạng thái
     function getStatusBadgeClass(status) {
       const s = String(status || '').toLowerCase();
+      
+      // Ưu tiên kiểm tra không hợp lệ / trùng dữ liệu trước -> Tô đỏ
+      if (isInvalidStatus(status)) {
+        return 'bg-rose-50 text-rose-700 border-rose-300 font-bold';
+      }
+      
+      // Hợp lệ / Đã duyệt -> Xanh lá
       if (s.includes('hợp lệ') || s.includes('thành công') || s.includes('đã duyệt') || s.includes('hoàn tất')) {
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      } else if (s.includes('chờ') || s.includes('đang')) {
+      } 
+      
+      // Chờ duyệt / Bổ sung -> Màu cam vàng
+      if (s.includes('chờ') || s.includes('đang')) {
         return 'bg-amber-50 text-amber-700 border-amber-200';
-      } else if (s.includes('hủy') || s.includes('bị loại') || s.includes('chưa đạt')) {
-        return 'bg-rose-50 text-rose-700 border-rose-200';
       }
+      
       return 'bg-blue-50 text-blue-700 border-blue-200';
     }
 
-    // Hàm tạo và kích hoạt in thẻ dự thi
+    // Hàm in thẻ dự thi có kèm Logo BTC
     window.printCard = function(index) {
       const item = fetchedData[index];
       if (!item) return;
 
+      const LOGO_URL = "logo.png"; // Đặt file logo.png cùng thư mục trên GitHub hoặc dán link online
+
       printArea.innerHTML = `
-        <div style="border: 2px solid #1e3a8a; border-radius: 12px; padding: 24px; font-family: sans-serif; color: #1e293b; max-width: 650px; margin: auto;">
-          <div style="text-align: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; margin-bottom: 16px;">
-            <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin: 0;">BAN TỔ CHỨC HỘI THI</p>
-            <h2 style="font-size: 20px; font-weight: bold; color: #1e3a8a; margin: 4px 0; text-transform: uppercase;">PHIẾU BÁO DỰ THI</h2>
-            <p style="font-size: 13px; color: #475569; margin: 0;">Năm học 2026 - 2027</p>
+        <div style="border: 2px solid #1e3a8a; border-radius: 12px; padding: 20px 24px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; max-width: 650px; margin: auto; background: #fff;">
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; margin-bottom: 16px; gap: 16px;">
+            <div style="width: 80px; flex-shrink: 0; text-align: center;">
+              <img src="${LOGO_URL}" alt="Logo BTC" style="max-height: 70px; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;" onerror="this.style.display='none'">
+            </div>
+
+            <div style="flex: 1; text-align: center;">
+              <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #475569; font-weight: bold; margin: 0 0 2px 0;">BAN TỔ CHỨC CUỘC THI</p>
+              <h2 style="font-size: 19px; font-weight: 800; color: #1e3a8a; margin: 2px 0; text-transform: uppercase;">PHIẾU BÁO DỰ THI</h2>
+              <p style="font-size: 12px; color: #64748b; margin: 0;">Năm học 2026 - 2027</p>
+            </div>
+
+            <div style="width: 80px; flex-shrink: 0;"></div>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-            <div style="flex: 1;">
+            <div style="flex: 1; padding-right: 12px;">
               <div style="margin-bottom: 8px;">
-                <span style="font-size: 12px; color: #64748b;">MÃ HỒ SƠ / SBD:</span>
+                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Mã hồ sơ / SBD:</span>
                 <p style="font-size: 18px; font-weight: bold; color: #1d4ed8; margin: 2px 0;">${item.profileCode || '—'}</p>
               </div>
               <div style="margin-bottom: 8px;">
-                <span style="font-size: 12px; color: #64748b;">HỌ VÀ TÊN THÍ SINH:</span>
-                <p style="font-size: 18px; font-weight: bold; color: #0f172a; margin: 2px 0;">${item.fullName || '—'}</p>
+                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Họ và tên thí sinh:</span>
+                <p style="font-size: 17px; font-weight: bold; color: #0f172a; margin: 2px 0;">${item.fullName || '—'}</p>
               </div>
               <div style="margin-bottom: 8px;">
-                <span style="font-size: 12px; color: #64748b;">BẢNG DỰ THI:</span>
+                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Bảng dự thi:</span>
                 <p style="font-size: 14px; font-weight: 600; color: #0f172a; margin: 2px 0;">${item.group || '—'}</p>
               </div>
               <div style="margin-bottom: 8px;">
-                <span style="font-size: 12px; color: #64748b;">TRƯỜNG:</span>
+                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Trường:</span>
                 <p style="font-size: 14px; font-weight: 500; color: #0f172a; margin: 2px 0;">${item.schoolName || '—'}</p>
               </div>
               <div style="margin-bottom: 8px;">
-                <span style="font-size: 12px; color: #64748b;">ĐỊA ĐIỂM THI:</span>
+                <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Địa điểm thi:</span>
                 <p style="font-size: 14px; font-weight: 600; color: #0f172a; margin: 2px 0;">${item.venue || '—'}</p>
               </div>
             </div>
-            <!-- Khung ảnh 3x4 nếu cần dán ảnh -->
-            <div style="width: 100px; height: 130px; border: 1px dashed #94a3b8; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; color: #94a3b8; border-radius: 6px; margin-left: 16px;">
+
+            <div style="width: 100px; height: 130px; border: 1.5px dashed #94a3b8; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; color: #94a3b8; border-radius: 6px; flex-shrink: 0; background-color: #f8fafc;">
               Ảnh 3x4<br>(nếu có yêu cầu)
             </div>
           </div>
 
           <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
-            <span>Phụ huynh: <b>${item.parentName || '—'}</b></span>
-            <span>Trạng thái: <b>${item.status || '—'}</b></span>
+            <span>Phụ huynh: <b style="color: #334155;">${item.parentName || '—'}</b></span>
+            <span>Trạng thái: <b style="color: #15803d;">${item.status || '—'}</b></span>
           </div>
 
           <div style="margin-top: 12px; font-size: 11px; color: #64748b; font-style: italic; text-align: center;">
@@ -185,13 +217,32 @@
         btnSearch.disabled = false;
 
         if (res.success && res.data && res.data.length > 0) {
-          fetchedData = res.data; // Lưu lại để dùng khi in
+          fetchedData = res.data;
 
           res.data.forEach((item, index) => {
             const card = document.createElement('div');
             card.className = "bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4";
             
             const badgeClass = getStatusBadgeClass(item.status);
+            const isInvalid = isInvalidStatus(item.status);
+
+            // Nút in thẻ: Nếu không hợp lệ thì ẩn hoàn toàn, ngược lại hiển thị nút in
+            const printButtonHtml = isInvalid 
+              ? `<div class="pt-2 border-t text-right">
+                   <span class="text-xs text-rose-500 italic font-medium">Hồ sơ không hợp lệ nên không thể xuất thẻ dự thi.</span>
+                 </div>`
+              : `<div class="pt-2 border-t flex justify-end">
+                   <button 
+                     type="button" 
+                     onclick="printCard(${index})" 
+                     class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-blue-50 text-blue-700 hover:text-blue-800 text-sm font-semibold rounded-xl border border-slate-200 hover:border-blue-300 transition duration-150"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                     </svg>
+                     In thẻ dự thi / Lưu PDF
+                   </button>
+                 </div>`;
 
             card.innerHTML = `
               <div class="flex items-center justify-between border-b pb-3">
@@ -227,19 +278,8 @@
                 </div>
               </div>
 
-              <!-- Nút In Thẻ Dự Thi -->
-              <div class="pt-2 border-t flex justify-end">
-                <button 
-                  type="button" 
-                  onclick="printCard(${index})" 
-                  class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-blue-50 text-blue-700 hover:text-blue-800 text-sm font-semibold rounded-xl border border-slate-200 hover:border-blue-300 transition duration-150"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                  In thẻ dự thi / Lưu PDF
-                </button>
-              </div>
+              <!-- Khu vực nút In hoặc thông báo hồ sơ không hợp lệ -->
+              ${printButtonHtml}
             `;
             results.appendChild(card);
           });
